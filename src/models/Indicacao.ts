@@ -41,7 +41,7 @@ const indicacaoSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pendente', 'validado', 'invalido'],
+    enum: ['pendente', 'aprovado', 'rejeitado'],
     default: 'pendente'
   },
   dataCriacao: {
@@ -56,7 +56,7 @@ indicacaoSchema.pre('save', async function(next) {
     // Verifica se o indicador já tem 5 indicações válidas
     const indicacoesValidas = await mongoose.model('Indicacao').countDocuments({
       whatsappIndicador: this.whatsappIndicador,
-      status: 'validado'
+      status: 'aprovado'
     });
 
     if (indicacoesValidas >= 5) {

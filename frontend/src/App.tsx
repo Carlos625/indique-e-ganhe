@@ -1,11 +1,12 @@
 import React from 'react';
 import { ChakraProvider, Box, Container, extendTheme } from '@chakra-ui/react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import IndicacaoForm from './components/IndicacaoForm';
 import Ranking from './components/Ranking';
 import AdminIndicacoes from './components/AdminIndicacoes';
 import Login from './components/Login';
+import TesteRanking from './components/TesteRanking';
 
 // Tema personalizado para barbearia
 const theme = extendTheme({
@@ -32,10 +33,18 @@ const theme = extendTheme({
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('token');
   const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (!token) {
+      navigate('/login', { state: { from: location }, replace: true });
+    }
+  }, [token, location, navigate]);
 
   if (!token) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return null;
   }
+
   return <>{children}</>;
 };
 
@@ -60,39 +69,55 @@ function App() {
 
           {/* Conteúdo */}
           <Box position="relative" zIndex="2">
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route
-                path="/*"
-                element={
-                  <ProtectedRoute>
-                    <>
-                      <Navbar />
-                      <Container 
-                        maxW="container.xl" 
-                        py={8}
-                        sx={{
-                          '& > *': {
-                            backdropFilter: 'blur(5px)',
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            borderRadius: 'lg',
-                            boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3)',
-                            padding: '6',
-                          }
-                        }}
-                      >
-                        <Routes>
-                          <Route path="/" element={<IndicacaoForm />} />
-                          <Route path="/ranking" element={<Ranking />} />
-                          <Route path="/admin" element={<AdminIndicacoes />} />
-                          <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-                      </Container>
-                    </>
-                  </ProtectedRoute>
+            <Navbar />
+            <Container 
+              maxW="container.xl" 
+              py={8}
+              sx={{
+                '& > *': {
+                  backdropFilter: 'blur(5px)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  borderRadius: 'lg',
+                  boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3)',
+                  padding: '6',
                 }
-              />
-            </Routes>
+              }}
+            >
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                {/* Rotas públicas */}
+                <Route path="/" element={<IndicacaoForm />} />
+                
+                {/* Rotas protegidas */}
+                <Route
+                  path="/ranking"
+                  element={
+                    <ProtectedRoute>
+                      <Ranking />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute>
+                      <AdminIndicacoes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/teste-ranking"
+                  element={
+                    <ProtectedRoute>
+                      <TesteRanking />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Rota padrão */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Container>
           </Box>
         </Box>
       </Router>

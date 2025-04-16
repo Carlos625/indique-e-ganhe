@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Table,
@@ -8,63 +8,62 @@ import {
   Th,
   Td,
   Button,
-  HStack,
-  Badge,
-  Heading,
-  Stat,
-  StatLabel,
-  StatNumber,
-  SimpleGrid,
   useToast,
-  Link,
-  Tooltip,
+  Heading,
+  Container,
   Spinner,
   Center,
   Alert,
   AlertIcon,
-  Container,
+  Badge,
+  Text,
+  useBreakpointValue,
+  TableContainer,
+  Flex,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  IconButton,
+  Tooltip,
+  HStack,
+  VStack,
+  Divider,
 } from '@chakra-ui/react';
+import { ChevronDownIcon, CheckIcon, CloseIcon, TimeIcon, InfoIcon, RepeatIcon } from '@chakra-ui/icons';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = 'http://localhost:3001';
-
 interface Indicacao {
   _id: string;
-  nomeIndicador: string;
-  whatsappIndicador: string;
   nomeIndicado: string;
   whatsappIndicado: string;
-  status: 'pendente' | 'validado' | 'invalido';
+  nomeIndicador: string;
+  whatsappIndicador: string;
+  status: 'pendente' | 'aprovado' | 'rejeitado';
   dataCriacao: string;
 }
 
-interface Stats {
-  total: number;
-  pendentes: number;
-  validadas: number;
-  invalidas: number;
-}
-
 const AdminIndicacoes: React.FC = () => {
-  const [indicacoes, setIndicacoes] = React.useState<Indicacao[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [indicacoes, setIndicacoes] = useState<Indicacao[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const toast = useToast();
   const navigate = useNavigate();
+  
+  // Ajustes responsivos
+  const containerWidth = useBreakpointValue({ base: "100%", md: "95%", lg: "90%" });
+  const headingSize = useBreakpointValue({ base: "xl", md: "2xl" });
+  const tableSize = useBreakpointValue({ base: "sm", md: "md" });
+  const showFullTable = useBreakpointValue({ base: false, md: true });
+  const buttonSize = useBreakpointValue({ base: "sm", md: "md" });
+  const padding = useBreakpointValue({ base: 2, md: 4 });
 
-  const stats = React.useMemo(() => {
-    return {
-      total: indicacoes.length,
-      pendentes: indicacoes.filter(i => i.status === 'pendente').length,
-      validadas: indicacoes.filter(i => i.status === 'validado').length,
-      invalidas: indicacoes.filter(i => i.status === 'invalido').length
-    };
-  }, [indicacoes]);
+  useEffect(() => {
+    fetchIndicacoes();
+  }, []);
 
   const fetchIndicacoes = async () => {
-    setLoading(true);
-    setError(null);
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -72,70 +71,27 @@ const AdminIndicacoes: React.FC = () => {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/api/indicacoes`, {
+      const response = await axios.get<Indicacao[]>(`${import.meta.env.VITE_API_URL}/api/indicacoes`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
+
       setIndicacoes(response.data);
+      setError(null);
     } catch (error: any) {
       console.error('Erro ao buscar indicações:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        localStorage.removeItem('token');
+      if (error.response?.status === 401) {
         navigate('/login');
-        return;
+      } else {
+        setError('Não foi possível carregar as indicações. Tente novamente mais tarde.');
       }
-      setError(error.response?.data?.error || error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  React.useEffect(() => {
-    console.log('AdminIndicacoes montado');
-    console.log('API URL:', API_URL);
-    fetchIndicacoes();
-  }, []);
-
-  const getStatusBadge = (status: 'pendente' | 'validado' | 'invalido') => {
-    const statusProps = {
-      pendente: { colorScheme: 'yellow', text: 'PENDENTE' },
-      validado: { colorScheme: 'green', text: 'VALIDADO' },
-      invalido: { colorScheme: 'red', text: 'INVÁLIDO' }
-    }[status];
-
-    return (
-      <Badge
-        colorScheme={statusProps?.colorScheme}
-        px={3}
-        py={1}
-        borderRadius="full"
-        textTransform="uppercase"
-        fontWeight="bold"
-      >
-        {statusProps?.text}
-      </Badge>
-    );
-  };
-
-  const formatWhatsApp = (whatsapp: string | undefined): string => {
-    if (!whatsapp) return '-';
-    const cleaned = whatsapp.replace(/\D/g, '');
-    if (cleaned.length !== 11) return whatsapp;
-    return `(${cleaned.slice(0,2)}) ${cleaned.slice(2,7)}-${cleaned.slice(7)}`;
-  };
-
-  const renderWhatsAppLink = (whatsapp: string | undefined) => {
-    if (!whatsapp) return '-';
-    const formattedNumber = formatWhatsApp(whatsapp);
-    return (
-      <Link href={`https://wa.me/55${whatsapp}`} isExternal color="blue.500">
-        {formattedNumber}
-      </Link>
-    );
-  };
-
-  const handleStatusUpdate = async (id: string, newStatus: Indicacao['status']) => {
+  const handleStatusUpdate = async (id: string, novoStatus: 'aprovado' | 'rejeitado' | 'pendente') => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -144,152 +100,203 @@ const AdminIndicacoes: React.FC = () => {
       }
 
       await axios.patch(
-        `${API_URL}/api/indicacoes/${id}/status`, 
-        { status: newStatus },
+        `${import.meta.env.VITE_API_URL}/api/indicacoes/${id}/status`,
+        { status: novoStatus },
         {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
-      await fetchIndicacoes();
+
+      // Atualiza a lista local
+      setIndicacoes(prev =>
+        prev.map(ind =>
+          ind._id === id ? { ...ind, status: novoStatus } : ind
+        )
+      );
+
       toast({
         title: 'Status atualizado com sucesso',
+        description: `Indicação ${novoStatus === 'aprovado' ? 'aprovada' : novoStatus === 'rejeitado' ? 'rejeitada' : 'marcada como pendente'}`,
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
     } catch (error: any) {
       console.error('Erro ao atualizar status:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        localStorage.removeItem('token');
+      if (error.response?.status === 401) {
         navigate('/login');
-        return;
+      } else {
+        toast({
+          title: 'Erro ao atualizar status',
+          description: error.response?.data?.message || 'Ocorreu um erro ao atualizar o status. Tente novamente.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
       }
-      toast({
-        title: 'Erro ao atualizar status',
-        description: error.response?.data?.error || error.message,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
     }
   };
 
+  const formatWhatsApp = (whatsapp: string) => {
+    const cleaned = whatsapp.replace(/\D/g, '');
+    return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 3)} ${cleaned.substring(3, 7)}-${cleaned.substring(7, 11)}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'aprovado':
+        return <Badge colorScheme="green" fontSize="md" px={2} py={1} borderRadius="md">Aprovado</Badge>;
+      case 'rejeitado':
+        return <Badge colorScheme="red" fontSize="md" px={2} py={1} borderRadius="md">Rejeitado</Badge>;
+      default:
+        return <Badge colorScheme="yellow" fontSize="md" px={2} py={1} borderRadius="md">Pendente</Badge>;
+    }
+  };
+
+  if (loading) {
+    return (
+      <Center h="50vh">
+        <Spinner size="xl" color="barber.500" thickness="4px" />
+      </Center>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxW="container.md" py={8}>
+        <Alert status="error" borderRadius="md">
+          <AlertIcon />
+          {error}
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container maxW="container.xl" py={8}>
-      {loading ? (
-        <Center p={8}>
-          <Spinner size="xl" />
-        </Center>
-      ) : error ? (
-        <Alert status="error" mb={4}>
-          <AlertIcon />
-          <Box>{error}</Box>
-        </Alert>
-      ) : indicacoes.length === 0 ? (
-        <Alert status="info" mb={4}>
-          <AlertIcon />
-          <Box>Nenhuma indicação encontrada.</Box>
-        </Alert>
-      ) : (
-        <Box>
-          <Box mb={8}>
-            <Heading size="lg" color="barber.500" mb={6}>
-              Dashboard de Indicações
-            </Heading>
-            
-            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={8}>
-              <Box p={5} bg="white" borderRadius="lg" boxShadow="md" border="1px" borderColor="gray.200">
-                <Stat>
-                  <StatLabel fontSize="lg" color="gray.500">Total</StatLabel>
-                  <StatNumber fontSize="3xl" color="barber.500">{stats.total}</StatNumber>
-                </Stat>
-              </Box>
-              <Box p={5} bg="white" borderRadius="lg" boxShadow="md" border="1px" borderColor="yellow.200">
-                <Stat>
-                  <StatLabel fontSize="lg" color="yellow.500">Pendentes</StatLabel>
-                  <StatNumber fontSize="3xl" color="yellow.500">{stats.pendentes}</StatNumber>
-                </Stat>
-              </Box>
-              <Box p={5} bg="white" borderRadius="lg" boxShadow="md" border="1px" borderColor="green.200">
-                <Stat>
-                  <StatLabel fontSize="lg" color="green.500">Validadas</StatLabel>
-                  <StatNumber fontSize="3xl" color="green.500">{stats.validadas}</StatNumber>
-                </Stat>
-              </Box>
-              <Box p={5} bg="white" borderRadius="lg" boxShadow="md" border="1px" borderColor="red.200">
-                <Stat>
-                  <StatLabel fontSize="lg" color="red.500">Inválidas</StatLabel>
-                  <StatNumber fontSize="3xl" color="red.500">{stats.invalidas}</StatNumber>
-                </Stat>
-              </Box>
-            </SimpleGrid>
+      <Box 
+        bg="white" 
+        p={{ base: 4, md: 8 }} 
+        borderRadius="lg" 
+        boxShadow="xl"
+        w={containerWidth}
+        mx="auto"
+      >
+        <Heading 
+          as="h1" 
+          size={headingSize} 
+          textAlign="center" 
+          color="barber.500"
+          mb={6}
+        >
+          Administração de Indicações
+        </Heading>
 
-            <Box overflowX="auto" bg="white" borderRadius="lg" boxShadow="md">
-              <Table variant="simple">
-                <Thead bg="barber.500">
-                  <Tr>
-                    <Th color="white">DATA</Th>
-                    <Th color="white">INDICADOR</Th>
-                    <Th color="white">WHATSAPP INDICADOR</Th>
-                    <Th color="white">INDICADO</Th>
-                    <Th color="white">WHATSAPP INDICADO</Th>
-                    <Th color="white">STATUS</Th>
-                    <Th color="white">AÇÕES</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {indicacoes.map((indicacao) => (
-                    <Tr key={indicacao._id}>
-                      <Td>{new Date(indicacao.dataCriacao).toLocaleDateString()}</Td>
-                      <Td fontWeight="medium">{indicacao.nomeIndicador}</Td>
-                      <Td>{renderWhatsAppLink(indicacao.whatsappIndicador)}</Td>
-                      <Td fontWeight="medium">{indicacao.nomeIndicado}</Td>
-                      <Td>{renderWhatsAppLink(indicacao.whatsappIndicado)}</Td>
-                      <Td>{getStatusBadge(indicacao.status)}</Td>
+        {indicacoes.length === 0 ? (
+          <Text textAlign="center" fontSize="lg" color="gray.600">
+            Nenhuma indicação registrada ainda.
+          </Text>
+        ) : (
+          <TableContainer overflowX="auto">
+            <Table variant="simple" size={tableSize}>
+              <Thead>
+                <Tr>
+                  <Th>Data</Th>
+                  <Th>Indicado</Th>
+                  {showFullTable && <Th>WhatsApp Indicado</Th>}
+                  <Th>Indicador</Th>
+                  {showFullTable && <Th>WhatsApp Indicador</Th>}
+                  <Th>Status</Th>
+                  <Th>Ações</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {indicacoes.map((indicacao) => (
+                  <Tr key={indicacao._id}>
+                    <Td>
+                      <Tooltip label={formatDate(indicacao.dataCriacao)}>
+                        <Text>{new Date(indicacao.dataCriacao).toLocaleDateString('pt-BR')}</Text>
+                      </Tooltip>
+                    </Td>
+                    <Td>
+                      <Tooltip label={showFullTable ? "" : formatWhatsApp(indicacao.whatsappIndicado)}>
+                        <Text fontWeight="medium">{indicacao.nomeIndicado}</Text>
+                      </Tooltip>
+                    </Td>
+                    {showFullTable && (
                       <Td>
-                        {indicacao.status === 'pendente' ? (
-                          <HStack spacing={2}>
-                            <Tooltip label="Validar indicação">
-                              <Button
-                                size="sm"
-                                colorScheme="green"
-                                onClick={() => handleStatusUpdate(indicacao._id, 'validado')}
-                              >
-                                ✓
-                              </Button>
-                            </Tooltip>
-                            <Tooltip label="Invalidar indicação">
-                              <Button
-                                size="sm"
-                                colorScheme="red"
-                                onClick={() => handleStatusUpdate(indicacao._id, 'invalido')}
-                              >
-                                ✕
-                              </Button>
-                            </Tooltip>
-                          </HStack>
-                        ) :
-                          <Tooltip label="Marcar como pendente">
-                            <Button
-                              size="sm"
-                              colorScheme="yellow"
+                        <Text>{formatWhatsApp(indicacao.whatsappIndicado)}</Text>
+                      </Td>
+                    )}
+                    <Td>
+                      <Tooltip label={showFullTable ? "" : formatWhatsApp(indicacao.whatsappIndicador)}>
+                        <Text fontWeight="medium">{indicacao.nomeIndicador}</Text>
+                      </Tooltip>
+                    </Td>
+                    {showFullTable && (
+                      <Td>
+                        <Text>{formatWhatsApp(indicacao.whatsappIndicador)}</Text>
+                      </Td>
+                    )}
+                    <Td>{getStatusBadge(indicacao.status)}</Td>
+                    <Td>
+                      <Menu>
+                        <MenuButton
+                          as={Button}
+                          rightIcon={<ChevronDownIcon />}
+                          size={buttonSize}
+                          colorScheme="blue"
+                        >
+                          Ações
+                        </MenuButton>
+                        <MenuList>
+                          {indicacao.status !== 'aprovado' && (
+                            <MenuItem
+                              icon={<CheckIcon />}
+                              onClick={() => handleStatusUpdate(indicacao._id, 'aprovado')}
+                            >
+                              Aprovar
+                            </MenuItem>
+                          )}
+                          {indicacao.status !== 'rejeitado' && (
+                            <MenuItem
+                              icon={<CloseIcon />}
+                              onClick={() => handleStatusUpdate(indicacao._id, 'rejeitado')}
+                            >
+                              Rejeitar
+                            </MenuItem>
+                          )}
+                          {indicacao.status !== 'pendente' && (
+                            <MenuItem
+                              icon={<TimeIcon />}
                               onClick={() => handleStatusUpdate(indicacao._id, 'pendente')}
                             >
-                              ↺
-                            </Button>
-                          </Tooltip>
-                        }
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </Box>
-          </Box>
-        </Box>
-      )}
+                              Marcar como Pendente
+                            </MenuItem>
+                          )}
+                        </MenuList>
+                      </Menu>
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          </TableContainer>
+        )}
+      </Box>
     </Container>
   );
 };

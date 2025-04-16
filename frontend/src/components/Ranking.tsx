@@ -1,26 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
+  Heading,
   Table,
   Thead,
   Tbody,
   Tr,
   Th,
   Td,
-  Link,
-  Heading,
-  VStack,
-  useToast,
-  Badge,
+  Text,
+  Container,
   Spinner,
   Center,
   Alert,
   AlertIcon,
+  useBreakpointValue,
+  TableContainer,
+  Badge,
+  Flex,
+  Icon,
+  Tooltip,
 } from '@chakra-ui/react';
+import { FaTrophy, FaMedal, FaAward } from 'react-icons/fa';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = 'http://localhost:3001';
 
 interface RankingItem {
   _id: string;
@@ -30,144 +33,183 @@ interface RankingItem {
 }
 
 const Ranking: React.FC = () => {
-  const [ranking, setRanking] = React.useState<RankingItem[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const toast = useToast();
+  const [ranking, setRanking] = useState<RankingItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  
+  // Ajustes responsivos
+  const containerWidth = useBreakpointValue({ base: "100%", md: "90%", lg: "80%" });
+  const headingSize = useBreakpointValue({ base: "xl", md: "2xl" });
+  const tableSize = useBreakpointValue({ base: "sm", md: "md" });
+  const showFullTable = useBreakpointValue({ base: false, md: true });
+  const padding = useBreakpointValue({ base: 2, md: 4 });
 
-  const fetchRanking = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/api/indicacoes/ranking`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined
-      });
-      setRanking(response.data || []);
-    } catch (error: any) {
-      console.error('Erro ao buscar ranking:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        navigate('/login');
-        return;
+  useEffect(() => {
+    const fetchRanking = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+
+        console.log('Buscando dados do ranking...');
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        console.log('URL da API:', `${API_URL}/api/indicacoes/ranking`);
+        
+        const response = await axios.get(`${API_URL}/api/indicacoes/ranking`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        console.log('Dados do ranking recebidos:', response.data);
+        
+        // Verificar se os dados estão no formato esperado
+        if (Array.isArray(response.data)) {
+          // Garantir que cada item tenha um _id
+          const rankingData = response.data.map((item, index) => ({
+            ...item,
+            _id: item._id || `temp-${index}`,
+            totalIndicacoes: Number(item.totalIndicacoes) || 0
+          }));
+          
+          console.log('Dados do ranking processados:', rankingData);
+          setRanking(rankingData);
+          setError(null);
+        } else {
+          console.error('Formato de dados inválido:', response.data);
+          setError('Formato de dados inválido recebido do servidor.');
+        }
+      } catch (error: any) {
+        console.error('Erro ao buscar ranking:', error);
+        if (error.response?.status === 401) {
+          navigate('/login');
+        } else {
+          setError('Não foi possível carregar o ranking. Tente novamente mais tarde.');
+        }
+      } finally {
+        setLoading(false);
       }
-      setError('Não foi possível carregar o ranking.');
-    } finally {
-      setLoading(false);
+    };
+
+    fetchRanking();
+  }, [navigate]);
+
+  const getPositionIcon = (position: number) => {
+    switch (position) {
+      case 0:
+        return <Icon as={FaTrophy} color="yellow.400" boxSize={6} />;
+      case 1:
+        return <Icon as={FaMedal} color="gray.400" boxSize={5} />;
+      case 2:
+        return <Icon as={FaAward} color="orange.400" boxSize={5} />;
+      default:
+        return null;
     }
   };
 
-  React.useEffect(() => {
-    fetchRanking();
-  }, []);
-
-  const formatWhatsApp = (numero: string | undefined): string => {
-    if (!numero) return '-';
-    const cleaned = numero.replace(/\D/g, '');
-    if (cleaned.length !== 11) return numero;
-    return `(${cleaned.slice(0,2)}) ${cleaned.slice(2,3)} ${cleaned.slice(3,7)}-${cleaned.slice(7)}`;
-  };
-
-  const renderWhatsAppLink = (whatsapp: string | undefined) => {
-    if (!whatsapp) return '-';
-    const cleaned = whatsapp.replace(/\D/g, '');
-    if (!cleaned) return '-';
+  const formatWhatsApp = (whatsapp: string | undefined) => {
+    if (!whatsapp) return 'N/A';
     
-    return (
-      <Link
-        href={`https://wa.me/55${cleaned}`}
-        color="barber.accent"
-        isExternal
-        _hover={{ color: 'barber.500', textDecoration: 'none' }}
-      >
-        {formatWhatsApp(whatsapp)}
-      </Link>
-    );
+    try {
+      const cleaned = whatsapp.replace(/\D/g, '');
+      if (cleaned.length < 11) return whatsapp;
+      
+      return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 3)} ${cleaned.substring(3, 7)}-${cleaned.substring(7, 11)}`;
+    } catch (error) {
+      console.error('Erro ao formatar WhatsApp:', error);
+      return whatsapp;
+    }
   };
 
   if (loading) {
     return (
-      <Center p={8}>
-        <Spinner size="xl" color="barber.accent" />
+      <Center h="50vh">
+        <Spinner size="xl" color="barber.500" thickness="4px" />
       </Center>
     );
   }
 
   if (error) {
     return (
-      <Alert status="error" mb={4}>
-        <AlertIcon />
-        <Box>{error}</Box>
-      </Alert>
+      <Container maxW="container.md" py={8}>
+        <Alert status="error" borderRadius="md">
+          <AlertIcon />
+          {error}
+        </Alert>
+      </Container>
     );
   }
 
   return (
-    <Box>
-      <VStack spacing={8} align="stretch">
-        <Box textAlign="center">
-          <Heading size="xl" color="barber.500" mb={2}>
-            Ranking de Indicações
-          </Heading>
-          <Heading size="md" color="barber.accent">
-            Concorra a R$ 1.500,00 em prêmios
-          </Heading>
-        </Box>
+    <Container maxW="container.xl" py={8}>
+      <Box 
+        bg="white" 
+        p={{ base: 4, md: 8 }} 
+        borderRadius="lg" 
+        boxShadow="xl"
+        w={containerWidth}
+        mx="auto"
+      >
+        <Heading 
+          as="h1" 
+          size={headingSize} 
+          textAlign="center" 
+          color="barber.500"
+          mb={6}
+        >
+          Ranking de Indicações
+        </Heading>
 
-        <Box bg="white" borderRadius="lg" boxShadow="md" overflow="hidden">
-          <Table variant="simple">
-            <Thead bg="barber.500">
-              <Tr>
-                <Th color="white" textAlign="center" width="100px">POSIÇÃO</Th>
-                <Th color="white">NOME</Th>
-                <Th color="white">WHATSAPP</Th>
-                <Th color="white" textAlign="center">INDICAÇÕES VÁLIDAS</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {ranking.length > 0 ? (
-                ranking.map((item, index) => (
-                  <Tr key={item._id}>
-                    <Td textAlign="center">
-                      <Badge
-                        colorScheme={index < 3 ? "yellow" : "gray"}
-                        fontSize="lg"
-                        px={3}
-                        py={1}
-                        borderRadius="full"
-                      >
-                        {index + 1}º
-                      </Badge>
+        {ranking.length === 0 ? (
+          <Text textAlign="center" fontSize="lg" color="gray.600">
+            Nenhuma indicação registrada ainda.
+          </Text>
+        ) : (
+          <TableContainer>
+            <Table variant="simple" size={tableSize}>
+              <Thead>
+                <Tr>
+                  <Th width="10%">Posição</Th>
+                  <Th>Nome</Th>
+                  {showFullTable && <Th>WhatsApp</Th>}
+                  <Th isNumeric>Indicações</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {ranking.map((item, index) => (
+                  <Tr key={item._id || index}>
+                    <Td>
+                      <Flex align="center" gap={2}>
+                        {getPositionIcon(index)}
+                        <Text fontWeight="bold">{index + 1}º</Text>
+                      </Flex>
                     </Td>
-                    <Td fontWeight="bold">{item.nomeIndicador || '-'}</Td>
-                    <Td>{renderWhatsAppLink(item.whatsappIndicador)}</Td>
-                    <Td textAlign="center">
-                      <Badge
-                        colorScheme="green"
-                        fontSize="lg"
-                        px={3}
-                        py={1}
-                        borderRadius="full"
-                      >
+                    <Td>
+                      <Tooltip label={showFullTable ? "" : formatWhatsApp(item.whatsappIndicador)}>
+                        <Text fontWeight="medium">{item.nomeIndicador || 'Anônimo'}</Text>
+                      </Tooltip>
+                    </Td>
+                    {showFullTable && (
+                      <Td>
+                        <Text>{formatWhatsApp(item.whatsappIndicador)}</Text>
+                      </Td>
+                    )}
+                    <Td isNumeric>
+                      <Badge colorScheme="blue" fontSize="md" px={2} py={1} borderRadius="md">
                         {item.totalIndicacoes || 0}
                       </Badge>
                     </Td>
                   </Tr>
-                ))
-              ) : (
-                <Tr>
-                  <Td colSpan={4} textAlign="center" py={8}>
-                    <Box color="gray.500" fontSize="lg">
-                      Nenhuma indicação validada ainda
-                    </Box>
-                  </Td>
-                </Tr>
-              )}
-            </Tbody>
-          </Table>
-        </Box>
-      </VStack>
-    </Box>
+                ))}
+              </Tbody>
+            </Table>
+          </TableContainer>
+        )}
+      </Box>
+    </Container>
   );
 };
 

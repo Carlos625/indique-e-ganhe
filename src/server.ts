@@ -94,10 +94,17 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-// Rotas protegidas
-app.post('/api/indicacoes', authenticateToken, async (req, res) => {
+// Rotas públicas
+app.post('/api/indicacoes', async (req, res) => {
   try {
     console.log('Recebendo nova indicação:', req.body);
+
+    // Validação dos campos obrigatórios
+    if (!req.body.nomeIndicador || !req.body.nomeIndicado || !req.body.whatsappIndicador || !req.body.whatsappIndicado) {
+      return res.status(400).json({
+        error: 'Todos os campos são obrigatórios. Preencha nome e WhatsApp do indicador e do indicado.'
+      });
+    }
 
     // Função para limpar e padronizar números de WhatsApp
     const limparNumeroWhatsApp = (numero: string) => {
@@ -105,10 +112,26 @@ app.post('/api/indicacoes', authenticateToken, async (req, res) => {
       return numeroLimpo.startsWith('55') ? numeroLimpo.slice(2) : numeroLimpo;
     };
 
+    // Validação do formato do WhatsApp
+    const whatsappIndicador = limparNumeroWhatsApp(req.body.whatsappIndicador);
+    const whatsappIndicado = limparNumeroWhatsApp(req.body.whatsappIndicado);
+
+    if (whatsappIndicador.length !== 11) {
+      return res.status(400).json({
+        error: 'Formato de WhatsApp do indicador inválido. Use: (99) 9 9999-9999'
+      });
+    }
+
+    if (whatsappIndicado.length !== 11) {
+      return res.status(400).json({
+        error: 'Formato de WhatsApp do indicado inválido. Use: (99) 9 9999-9999'
+      });
+    }
+
     const dadosIndicacao = {
       ...req.body,
-      whatsappIndicador: limparNumeroWhatsApp(req.body.whatsappIndicador),
-      whatsappIndicado: limparNumeroWhatsApp(req.body.whatsappIndicado),
+      whatsappIndicador,
+      whatsappIndicado,
       status: 'pendente',
       dataCriacao: new Date()
     };
@@ -129,7 +152,7 @@ app.post('/api/indicacoes', authenticateToken, async (req, res) => {
     // Verifica se o número já foi indicado
     const indicacaoExistente = await Indicacao.findOne({
       whatsappIndicado: dadosIndicacao.whatsappIndicado,
-      status: { $in: ['pendente', 'validado'] }
+      status: { $in: ['pendente', 'aprovado'] }
     });
 
     if (indicacaoExistente) {
@@ -146,11 +169,32 @@ app.post('/api/indicacoes', authenticateToken, async (req, res) => {
     res.status(201).json(indicacao);
   } catch (error: any) {
     console.error('Erro ao criar indicação:', error);
-    res.status(500).json({ error: error.message || 'Erro ao criar indicação' });
+    
+    // Tratamento específico para erros de validação do Mongoose
+    if (error.name === 'ValidationError') {
+      const mensagensErro = Object.values(error.errors).map((err: any) => err.message);
+      return res.status(400).json({ 
+        error: mensagensErro.join('. ') 
+      });
+    }
+    
+    // Erro de duplicidade (código 11000)
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        error: 'Esta pessoa já foi indicada. Cada pessoa só pode ser indicada uma vez.' 
+      });
+    }
+
+    // Erro de limite de indicações
+    if (error.message?.includes('limite máximo de 5 indicações')) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.status(500).json({ error: 'Ocorreu um erro ao processar sua indicação. Tente novamente mais tarde.' });
   }
 });
 
-// Rota para listar indicações
+// Rotas protegidas (requerem autenticação)
 app.get('/api/indicacoes', authenticateToken, async (req, res) => {
   try {
     const indicacoes = await Indicacao.find().sort({ dataCriacao: -1 });
@@ -161,7 +205,6 @@ app.get('/api/indicacoes', authenticateToken, async (req, res) => {
   }
 });
 
-// Rota para atualizar status da indicação
 app.patch('/api/indicacoes/:id/status', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -184,16 +227,24 @@ app.patch('/api/indicacoes/:id/status', authenticateToken, async (req, res) => {
   }
 });
 
-// Rota para obter o ranking
 app.get('/api/indicacoes/ranking', authenticateToken, async (req, res) => {
   try {
+    console.log('Gerando ranking de indicações...');
+    
+    // Primeiro, vamos verificar se existem indicações válidas
+    const totalIndicacoesValidas = await Indicacao.countDocuments({ status: 'aprovado' });
+    console.log('Total de indicações válidas:', totalIndicacoesValidas);
+    
+    if (totalIndicacoesValidas === 0) {
+      console.log('Nenhuma indicação válida encontrada');
+      return res.json([]);
+    }
+    
     const ranking = await Indicacao.aggregate([
       {
-        // Filtra apenas indicações validadas
-        $match: { status: 'validado' }
+        $match: { status: 'aprovado' }
       },
       {
-        // Agrupa por whatsappIndicador e soma as indicações
         $group: {
           _id: '$whatsappIndicador',
           nomeIndicador: { $first: '$nomeIndicador' },
@@ -202,16 +253,14 @@ app.get('/api/indicacoes/ranking', authenticateToken, async (req, res) => {
         }
       },
       {
-        // Ordena por total de indicações (decrescente) e nome (crescente)
         $sort: { 
           totalIndicacoes: -1,
           nomeIndicador: 1
         }
       },
       {
-        // Formata o documento final
         $project: {
-          _id: 0,
+          _id: 1,
           nomeIndicador: 1,
           whatsappIndicador: 1,
           totalIndicacoes: 1
@@ -241,96 +290,139 @@ app.post('/api/limpar-banco', async (req, res) => {
 // Novo endpoint para receber dados do formulário externo
 app.post('/api/formulario/indicacao', async (req, res) => {
   try {
-    console.log('Dados recebidos do formulário:', req.body);
-    
-    // Validação dos campos obrigatórios
-    const camposObrigatorios = ['nomeIndicador', 'whatsappIndicador', 'nomeIndicado', 'whatsappIndicado'];
-    const camposFaltando = camposObrigatorios.filter(campo => !req.body[campo]);
-    
-    if (camposFaltando.length > 0) {
-      console.log('Campos obrigatórios faltando:', camposFaltando);
+    const dados = req.body;
+    console.log('Dados recebidos:', dados);
+
+    // Função para limpar número
+    const limparNumero = (numero: string) => {
+      if (!numero) return '';
+      return numero.replace(/\D/g, '').replace(/^55/, '');
+    };
+
+    // Limpa os números
+    const whatsappIndicador = limparNumero(dados.whatsappIndicador);
+    const whatsappIndicado = limparNumero(dados.whatsappIndicado);
+
+    console.log('Números após limpeza:', { whatsappIndicador, whatsappIndicado });
+
+    // 1. Validação de auto-indicação
+    if (whatsappIndicador === whatsappIndicado) {
+      console.log('Tentativa de auto-indicação detectada');
       return res.status(400).json({
         success: false,
-        message: `Campos obrigatórios faltando: ${camposFaltando.join(', ')}`
+        message: 'Você não pode indicar seu próprio número de WhatsApp'
       });
     }
 
-    // Função para limpar e padronizar números de WhatsApp
-    const limparNumeroWhatsApp = (numero: string) => {
-      const numeroLimpo = numero.replace(/\D/g, '');
-      return numeroLimpo.startsWith('55') ? numeroLimpo.slice(2) : numeroLimpo;
-    };
-
-    const dadosIndicacao = {
-      nomeIndicador: req.body.nomeIndicador.trim(),
-      whatsappIndicador: limparNumeroWhatsApp(req.body.whatsappIndicador),
-      nomeIndicado: req.body.nomeIndicado.trim(),
-      whatsappIndicado: limparNumeroWhatsApp(req.body.whatsappIndicado),
-      status: 'pendente',
-      dataCriacao: new Date()
-    };
-
-    console.log('Números após limpeza:', {
-      indicador: dadosIndicacao.whatsappIndicador,
-      indicado: dadosIndicacao.whatsappIndicado
-    });
-
-    // Validação de auto-indicação
-    if (dadosIndicacao.whatsappIndicador === dadosIndicacao.whatsappIndicado) {
-      console.log('Tentativa de auto-indicação detectada no formulário');
-      return res.status(400).json({
-        success: false,
-        message: 'Você não pode se auto-indicar. O número de WhatsApp do indicador e do indicado são iguais.'
-      });
-    }
-
-    // Verifica se o número já foi indicado
+    // 2. Verifica se o número já foi indicado
     const indicacaoExistente = await Indicacao.findOne({
-      whatsappIndicado: dadosIndicacao.whatsappIndicado,
-      status: { $in: ['pendente', 'validado'] }
+      whatsappIndicado: whatsappIndicado,
+      status: { $in: ['pendente', 'aprovado'] }
     });
 
     if (indicacaoExistente) {
-      console.log('Número já indicado anteriormente no formulário:', dadosIndicacao.whatsappIndicado);
+      console.log('Número já indicado:', whatsappIndicado);
       return res.status(400).json({
         success: false,
-        message: 'Esta pessoa já foi indicada anteriormente'
+        message: 'Este número já foi indicado anteriormente'
       });
     }
 
-    const indicacao = new Indicacao(dadosIndicacao);
-    await indicacao.save();
-    
-    console.log('Indicação criada com sucesso a partir do formulário:', indicacao);
-    res.status(201).json({
+    // 3. Cria a nova indicação
+    const novaIndicacao = new Indicacao({
+      nomeIndicador: dados.nomeIndicador.trim(),
+      whatsappIndicador: whatsappIndicador,
+      nomeIndicado: dados.nomeIndicado.trim(),
+      whatsappIndicado: whatsappIndicado,
+      status: 'pendente',
+      dataCriacao: new Date()
+    });
+
+    await novaIndicacao.save();
+    console.log('Indicação salva com sucesso');
+
+    return res.status(201).json({
       success: true,
-      message: 'Indicação recebida com sucesso!',
-      id: indicacao._id
+      message: 'Indicação recebida com sucesso! Em breve entraremos em contato.'
     });
-  } catch (error: any) {
-    console.error('Erro ao processar indicação do formulário:', error);
-    
-    // Tratamento específico para erro de duplicação
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'Você já indicou esta pessoa anteriormente'
-      });
-    }
 
-    // Tratamento para erros de validação do Mongoose
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        success: false,
-        message: Object.values(error.errors).map((err: any) => err.message).join(', ')
-      });
-    }
-
-    res.status(500).json({
+  } catch (error) {
+    console.error('Erro ao processar indicação:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Erro ao processar indicação',
-      error: error.message || 'Erro desconhecido'
+      message: 'Não foi possível processar sua indicação. Por favor, tente novamente.'
     });
+  }
+});
+
+// Rota para criar indicações de teste
+app.post('/api/teste/indicacoes', authenticateToken, async (req, res) => {
+  try {
+    console.log('Criando indicações de teste...');
+    
+    // Limpar indicações existentes
+    await Indicacao.deleteMany({});
+    console.log('Indicações existentes removidas');
+    
+    // Criar indicações de teste
+    const indicacoesTeste = [
+      {
+        nomeIndicador: 'João Silva',
+        whatsappIndicador: '11999999999',
+        nomeIndicado: 'Maria Oliveira',
+        whatsappIndicado: '11988888888',
+        status: 'aprovado',
+        dataCriacao: new Date()
+      },
+      {
+        nomeIndicador: 'João Silva',
+        whatsappIndicador: '11999999999',
+        nomeIndicado: 'Pedro Santos',
+        whatsappIndicado: '11977777777',
+        status: 'aprovado',
+        dataCriacao: new Date()
+      },
+      {
+        nomeIndicador: 'Ana Costa',
+        whatsappIndicador: '11966666666',
+        nomeIndicado: 'Carlos Ferreira',
+        whatsappIndicado: '11955555555',
+        status: 'aprovado',
+        dataCriacao: new Date()
+      },
+      {
+        nomeIndicador: 'Ana Costa',
+        whatsappIndicador: '11966666666',
+        nomeIndicado: 'Juliana Lima',
+        whatsappIndicado: '11944444444',
+        status: 'aprovado',
+        dataCriacao: new Date()
+      },
+      {
+        nomeIndicador: 'Ana Costa',
+        whatsappIndicador: '11966666666',
+        nomeIndicado: 'Roberto Alves',
+        whatsappIndicado: '11933333333',
+        status: 'aprovado',
+        dataCriacao: new Date()
+      },
+      {
+        nomeIndicador: 'Lucas Mendes',
+        whatsappIndicador: '11922222222',
+        nomeIndicado: 'Fernanda Souza',
+        whatsappIndicado: '11911111111',
+        status: 'aprovado',
+        dataCriacao: new Date()
+      }
+    ];
+    
+    await Indicacao.insertMany(indicacoesTeste);
+    console.log('Indicações de teste criadas com sucesso');
+    
+    res.json({ message: 'Indicações de teste criadas com sucesso', count: indicacoesTeste.length });
+  } catch (error: any) {
+    console.error('Erro ao criar indicações de teste:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

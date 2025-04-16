@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Button,
@@ -6,238 +6,319 @@ import {
   FormLabel,
   Input,
   VStack,
-  Heading,
   useToast,
-  Card,
-  CardBody,
+  Heading,
+  Text,
+  Container,
+  FormErrorMessage,
   InputGroup,
+  InputLeftElement,
+  Spinner,
+  useBreakpointValue,
+  SimpleGrid,
+  Flex,
+  Icon,
 } from '@chakra-ui/react';
+import { PhoneIcon, CheckIcon } from '@chakra-ui/icons';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = 'http://localhost:3001';
-
-interface FormData {
-  nomeIndicador: string;
-  whatsappIndicador: string;
-  nomeIndicado: string;
-  whatsappIndicado: string;
-}
-
 const IndicacaoForm: React.FC = () => {
-  const [formData, setFormData] = React.useState<FormData>({
-    nomeIndicador: '',
-    whatsappIndicador: '',
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
     nomeIndicado: '',
     whatsappIndicado: '',
+    nomeIndicador: '',
+    whatsappIndicador: '',
   });
-  const [loading, setLoading] = React.useState(false);
-  const toast = useToast();
-  const navigate = useNavigate();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Ajustes responsivos
+  const containerWidth = useBreakpointValue({ base: "100%", md: "80%", lg: "70%" });
+  const headingSize = useBreakpointValue({ base: "xl", md: "2xl" });
+  const textSize = useBreakpointValue({ base: "sm", md: "md" });
+  const buttonSize = useBreakpointValue({ base: "md", md: "lg" });
+  const spacing = useBreakpointValue({ base: 4, md: 6 });
 
-  const formatWhatsApp = (value: string) => {
-    // Remove tudo que não é número
-    const numero = value.replace(/\D/g, '');
-    
-    // Aplica a máscara
-    if (numero.length <= 11) {
-      return numero.replace(/^(\d{2})(\d{1})?(\d{4})?(\d{4})?/, function(_, ddd, n1, n2, n3) {
-        if (n3) return `(${ddd}) ${n1} ${n2}-${n3}`;
-        if (n2) return `(${ddd}) ${n1} ${n2}`;
-        if (n1) return `(${ddd}) ${n1}`;
-        if (ddd) return `(${ddd}`;
-        return '';
-      });
+  const validateWhatsApp = (number: string) => {
+    const cleanNumber = number.replace(/\D/g, '');
+    return cleanNumber.length >= 10 && cleanNumber.length <= 11;
+  };
+
+  const getWhatsAppErrorMessage = (number: string) => {
+    const cleanNumber = number.replace(/\D/g, '');
+    if (cleanNumber.length < 10) {
+      return 'Número de WhatsApp incompleto. Certifique-se de inserir o DDD e o número completo.';
+    } else if (cleanNumber.length > 11) {
+      return 'Número de WhatsApp muito longo. Verifique se não há dígitos extras.';
+    } else if (!/^\d+$/.test(cleanNumber)) {
+      return 'Número de WhatsApp inválido. Use apenas números.';
     }
-    
-    // Se passar de 11 dígitos, corta
-    return value.slice(0, 16);
+    return 'Formato de WhatsApp inválido. Use: (99) 9 9999-9999';
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Se for campo de WhatsApp, formata o número
-    if (name.includes('whatsapp')) {
-      setFormData(prev => ({ ...prev, [name]: formatWhatsApp(value) }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+    // Limpa o erro quando o usuário começa a digitar
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    // Validar números de WhatsApp
-    const whatsappRegex = /^\(\d{2}\) \d \d{4}-\d{4}$/;
-    if (!whatsappRegex.test(formData.whatsappIndicador) || !whatsappRegex.test(formData.whatsappIndicado)) {
-      toast({
-        title: 'Erro de Validação',
-        description: 'Números de WhatsApp inválidos. Use o formato: (99) 9 9999-9999',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Validar auto-indicação
-    const whatsappIndicadorLimpo = formData.whatsappIndicador.replace(/\D/g, '');
-    const whatsappIndicadoLimpo = formData.whatsappIndicado.replace(/\D/g, '');
     
-    if (whatsappIndicadorLimpo === whatsappIndicadoLimpo) {
-      toast({
-        title: 'Erro de Validação',
-        description: 'Você não pode se auto-indicar. O número de WhatsApp do indicador e do indicado são iguais.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+    // Validação
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.nomeIndicado) {
+      newErrors.nomeIndicado = 'Nome é obrigatório';
+    }
+    
+    if (!formData.whatsappIndicado) {
+      newErrors.whatsappIndicado = 'WhatsApp é obrigatório';
+    } else if (!validateWhatsApp(formData.whatsappIndicado)) {
+      newErrors.whatsappIndicado = getWhatsAppErrorMessage(formData.whatsappIndicado);
+    }
+    
+    if (!formData.nomeIndicador) {
+      newErrors.nomeIndicador = 'Nome é obrigatório';
+    }
+    
+    if (!formData.whatsappIndicador) {
+      newErrors.whatsappIndicador = 'WhatsApp é obrigatório';
+    } else if (!validateWhatsApp(formData.whatsappIndicador)) {
+      newErrors.whatsappIndicador = getWhatsAppErrorMessage(formData.whatsappIndicador);
+    }
+    
+    // Verifica se é auto-indicação
+    if (formData.whatsappIndicado === formData.whatsappIndicador) {
+      newErrors.whatsappIndicado = 'Você não pode indicar seu próprio número';
+      newErrors.whatsappIndicador = 'Você não pode indicar seu próprio número';
+    }
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       setLoading(false);
       return;
     }
-
+    
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-
-      await axios.post(
-        `${API_URL}/api/indicacoes`,
-        {
-          ...formData,
-          // Remove formatação antes de enviar
-          whatsappIndicador: formData.whatsappIndicador.replace(/\D/g, ''),
-          whatsappIndicado: formData.whatsappIndicado.replace(/\D/g, ''),
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/indicacoes`,
+        formData
       );
       
       toast({
-        title: 'Sucesso!',
-        description: 'Indicação registrada com sucesso.',
+        title: 'Indicação enviada com sucesso!',
+        description: 'Agradecemos sua indicação.',
         status: 'success',
         duration: 5000,
         isClosable: true,
       });
       
+      // Limpa o formulário após sucesso
       setFormData({
-        nomeIndicador: '',
-        whatsappIndicador: '',
         nomeIndicado: '',
         whatsappIndicado: '',
+        nomeIndicador: '',
+        whatsappIndicador: '',
       });
     } catch (error: any) {
       console.error('Erro ao enviar indicação:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        localStorage.removeItem('token');
-        navigate('/login');
-        return;
-      }
-      const errorMessage = error.response?.data?.error || 'Erro ao processar a indicação. Tente novamente.';
       
-      toast({
-        title: 'Não foi possível registrar a indicação',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      // Tratamento específico para erros de validação do backend
+      if (error.response?.status === 400) {
+        const errorMessage = error.response.data?.error || error.response.data?.message;
+        
+        if (errorMessage?.includes('auto-indicar')) {
+          toast({
+            title: 'Auto-indicação não permitida',
+            description: 'Você não pode indicar seu próprio número de WhatsApp.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
+        } else if (errorMessage?.includes('já foi indicada')) {
+          toast({
+            title: 'Indicação já realizada',
+            description: 'Este número já foi indicado anteriormente.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
+        } else if (errorMessage?.includes('Formato de WhatsApp inválido')) {
+          toast({
+            title: 'Formato de WhatsApp inválido',
+            description: 'Certifique-se de inserir o número no formato: (99) 9 9999-9999',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
+        } else {
+          toast({
+            title: 'Erro ao enviar indicação',
+            description: errorMessage || 'Ocorreu um erro ao processar sua indicação. Tente novamente.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+      } else {
+        toast({
+          title: 'Erro ao enviar indicação',
+          description: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card bg="white" borderRadius="lg" boxShadow="md" border="1px" borderColor="barber.accent">
-      <CardBody>
-        <VStack spacing={6} align="stretch">
-          <Box textAlign="center">
-            <Heading size="lg" color="barber.500">
-              Faça sua Indicação
-            </Heading>
-          </Box>
-          <Box as="form" onSubmit={handleSubmit}>
-            <VStack spacing={4}>
-              <FormControl isRequired>
-                <FormLabel color="barber.500">Seu Nome</FormLabel>
-                <Input
-                  name="nomeIndicador"
-                  value={formData.nomeIndicador}
-                  onChange={handleChange}
-                  placeholder="Digite seu nome"
-                  borderColor="barber.accent"
-                  _hover={{ borderColor: 'barber.500' }}
-                  _focus={{ borderColor: 'barber.500', boxShadow: '0 0 0 1px var(--chakra-colors-barber-500)' }}
-                />
-              </FormControl>
-              <FormControl isRequired>
-                <FormLabel color="barber.500">Seu WhatsApp</FormLabel>
-                <InputGroup>
-                  <Input
-                    name="whatsappIndicador"
-                    value={formData.whatsappIndicador}
-                    onChange={handleChange}
-                    placeholder="(99) 9 9999-9999"
-                    borderColor="barber.accent"
-                    _hover={{ borderColor: 'barber.500' }}
-                    _focus={{ borderColor: 'barber.500', boxShadow: '0 0 0 1px var(--chakra-colors-barber-500)' }}
-                  />
-                </InputGroup>
-              </FormControl>
-              <FormControl isRequired>
-                <FormLabel color="barber.500">Nome do Indicado</FormLabel>
-                <Input
-                  name="nomeIndicado"
-                  value={formData.nomeIndicado}
-                  onChange={handleChange}
-                  placeholder="Digite o nome da pessoa que você quer indicar"
-                  borderColor="barber.accent"
-                  _hover={{ borderColor: 'barber.500' }}
-                  _focus={{ borderColor: 'barber.500', boxShadow: '0 0 0 1px var(--chakra-colors-barber-500)' }}
-                />
-              </FormControl>
-              <FormControl isRequired>
-                <FormLabel color="barber.500">WhatsApp do Indicado</FormLabel>
-                <InputGroup>
-                  <Input
-                    name="whatsappIndicado"
-                    value={formData.whatsappIndicado}
-                    onChange={handleChange}
-                    placeholder="(99) 9 9999-9999"
-                    borderColor="barber.accent"
-                    _hover={{ borderColor: 'barber.500' }}
-                    _focus={{ borderColor: 'barber.500', boxShadow: '0 0 0 1px var(--chakra-colors-barber-500)' }}
-                  />
-                </InputGroup>
-              </FormControl>
+    <Container maxW="container.xl" py={8}>
+      <Box 
+        bg="white" 
+        p={{ base: 4, md: 8 }} 
+        borderRadius="lg" 
+        boxShadow="xl"
+        w={containerWidth}
+        mx="auto"
+      >
+        <VStack spacing={spacing} align="stretch">
+          <Heading 
+            as="h1" 
+            size={headingSize} 
+            textAlign="center" 
+            color="barber.500"
+            mb={2}
+          >
+            Indique um Amigo
+          </Heading>
+          
+          <Text 
+            textAlign="center" 
+            fontSize={textSize} 
+            color="gray.600"
+            mb={6}
+          >
+            Indique um amigo e ganhe pontos para concorrer a prêmios!
+          </Text>
+          
+          <form onSubmit={handleSubmit}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={spacing}>
+              {/* Seção do Indicado */}
+              <Box>
+                <Heading as="h2" size="md" mb={4} color="barber.500">
+                  Dados do Indicado
+                </Heading>
+                <VStack spacing={4} align="stretch">
+                  <FormControl isInvalid={!!errors.nomeIndicado}>
+                    <FormLabel>Nome do Indicado</FormLabel>
+                    <Input
+                      name="nomeIndicado"
+                      value={formData.nomeIndicado}
+                      onChange={handleChange}
+                      placeholder="Nome completo"
+                      size={buttonSize}
+                    />
+                    <FormErrorMessage>{errors.nomeIndicado}</FormErrorMessage>
+                  </FormControl>
+                  
+                  <FormControl isInvalid={!!errors.whatsappIndicado}>
+                    <FormLabel>WhatsApp do Indicado</FormLabel>
+                    <InputGroup size={buttonSize}>
+                      <InputLeftElement pointerEvents="none">
+                        <PhoneIcon color="gray.500" />
+                      </InputLeftElement>
+                      <Input
+                        name="whatsappIndicado"
+                        value={formData.whatsappIndicado}
+                        onChange={handleChange}
+                        placeholder="(00) 00000-0000"
+                        type="tel"
+                      />
+                    </InputGroup>
+                    <FormErrorMessage>{errors.whatsappIndicado}</FormErrorMessage>
+                  </FormControl>
+                </VStack>
+              </Box>
+              
+              {/* Seção do Indicador */}
+              <Box>
+                <Heading as="h2" size="md" mb={4} color="barber.500">
+                  Seus Dados
+                </Heading>
+                <VStack spacing={4} align="stretch">
+                  <FormControl isInvalid={!!errors.nomeIndicador}>
+                    <FormLabel>Seu Nome</FormLabel>
+                    <Input
+                      name="nomeIndicador"
+                      value={formData.nomeIndicador}
+                      onChange={handleChange}
+                      placeholder="Nome completo"
+                      size={buttonSize}
+                    />
+                    <FormErrorMessage>{errors.nomeIndicador}</FormErrorMessage>
+                  </FormControl>
+                  
+                  <FormControl isInvalid={!!errors.whatsappIndicador}>
+                    <FormLabel>Seu WhatsApp</FormLabel>
+                    <InputGroup size={buttonSize}>
+                      <InputLeftElement pointerEvents="none">
+                        <PhoneIcon color="gray.500" />
+                      </InputLeftElement>
+                      <Input
+                        name="whatsappIndicador"
+                        value={formData.whatsappIndicador}
+                        onChange={handleChange}
+                        placeholder="(00) 00000-0000"
+                        type="tel"
+                      />
+                    </InputGroup>
+                    <FormErrorMessage>{errors.whatsappIndicador}</FormErrorMessage>
+                  </FormControl>
+                </VStack>
+              </Box>
+            </SimpleGrid>
+            
+            <Flex justify="center" mt={8}>
               <Button
                 type="submit"
                 colorScheme="barber"
-                size="lg"
-                width="full"
-                mt={4}
-                bg="barber.500"
-                color="white"
-                _hover={{ bg: 'barber.accent' }}
+                size={buttonSize}
+                width={{ base: "100%", md: "auto" }}
                 isLoading={loading}
                 loadingText="Enviando..."
+                leftIcon={loading ? <Spinner size="sm" /> : <CheckIcon />}
+                _hover={{
+                  transform: 'scale(1.05)',
+                  transition: 'all 0.2s ease-in-out',
+                  boxShadow: 'lg'
+                }}
+                _active={{
+                  transform: 'scale(0.95)',
+                }}
               >
                 Enviar Indicação
               </Button>
-            </VStack>
-          </Box>
+            </Flex>
+          </form>
         </VStack>
-      </CardBody>
-    </Card>
+      </Box>
+    </Container>
   );
 };
 
