@@ -7,7 +7,7 @@ dotenv.config();
 async function createAdminUser() {
   try {
     // Conectar ao MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/indique-e-ganhe');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/indique-e-ganhe');
     console.log('Conectado ao MongoDB');
 
     // Criar usuário admin

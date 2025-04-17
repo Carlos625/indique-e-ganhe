@@ -14,13 +14,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-aqui';
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN || 'http://84.247.133.199:5173',
   credentials: true
 }));
 app.use(express.json());
 
 // Conectar ao MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/indique-e-ganhe')
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/indique-e-ganhe')
   .then(() => console.log('Conectado ao MongoDB'))
   .catch((err) => console.error('Erro ao conectar ao MongoDB:', err));
 

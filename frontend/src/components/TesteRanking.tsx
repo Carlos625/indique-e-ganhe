@@ -40,7 +40,7 @@ const TesteRanking: React.FC = () => {
         return;
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3012';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://84.247.133.199:3012';
       console.log('Criando indicações de teste...');
       
       const response = await axios.post<TestResponse>(`${API_URL}/api/teste/indicacoes`, {}, {
@@ -83,7 +83,7 @@ const TesteRanking: React.FC = () => {
         return;
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3012';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://84.247.133.199:3012';
       console.log('Verificando ranking...');
       
       const response = await axios.get<RankingItem[]>(`${API_URL}/api/indicacoes/ranking`, {
