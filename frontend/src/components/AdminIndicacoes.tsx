@@ -71,13 +71,38 @@ const AdminIndicacoes: React.FC = () => {
         return;
       }
 
+      console.log('Buscando indicações...');
       const response = await axios.get<Indicacao[]>(`${import.meta.env.VITE_API_URL}/api/indicacoes`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      setIndicacoes(response.data);
+      console.log('Resposta da API:', response.data);
+
+      // Verifica se a resposta é um array
+      if (!Array.isArray(response.data)) {
+        console.error('Resposta da API não é um array:', response.data);
+        setError('Formato de dados inválido recebido do servidor');
+        setIndicacoes([]);
+        return;
+      }
+
+      // Garante que todos os itens têm os campos necessários
+      const indicacoesValidas = response.data.filter(item => 
+        item && 
+        typeof item === 'object' && 
+        '_id' in item &&
+        'nomeIndicado' in item &&
+        'whatsappIndicado' in item &&
+        'nomeIndicador' in item &&
+        'whatsappIndicador' in item &&
+        'status' in item &&
+        'dataCriacao' in item
+      );
+
+      console.log('Indicações válidas:', indicacoesValidas);
+      setIndicacoes(indicacoesValidas);
       setError(null);
     } catch (error: any) {
       console.error('Erro ao buscar indicações:', error);
@@ -85,6 +110,7 @@ const AdminIndicacoes: React.FC = () => {
         navigate('/login');
       } else {
         setError('Não foi possível carregar as indicações. Tente novamente mais tarde.');
+        setIndicacoes([]);
       }
     } finally {
       setLoading(false);

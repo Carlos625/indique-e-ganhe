@@ -197,8 +197,15 @@ app.post('/api/indicacoes', async (req, res) => {
 // Rotas protegidas (requerem autenticação)
 app.get('/api/indicacoes', authenticateToken, async (req, res) => {
   try {
+    console.log('Buscando todas as indicações...');
     const indicacoes = await Indicacao.find().sort({ dataCriacao: -1 });
-    res.json(indicacoes);
+    console.log('Indicações encontradas:', indicacoes);
+    
+    // Garante que a resposta seja sempre um array
+    const indicacoesArray = Array.isArray(indicacoes) ? indicacoes : [];
+    console.log('Enviando resposta:', indicacoesArray);
+    
+    res.json(indicacoesArray);
   } catch (error: any) {
     console.error('Erro ao buscar indicações:', error);
     res.status(500).json({ error: error.message });
