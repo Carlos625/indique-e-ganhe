@@ -128,8 +128,12 @@ const AdminIndicacoes: React.FC = () => {
         return;
       }
 
+      const API_URL = 'http://84.247.133.199:3012';
+      console.log('Atualizando status da indicação:', id, 'para:', novoStatus);
+      console.log('URL da API:', `${API_URL}/api/indicacoes/${id}/status`);
+
       await axios.patch(
-        `${import.meta.env.VITE_API_URL}/api/indicacoes/${id}/status`,
+        `${API_URL}/api/indicacoes/${id}/status`,
         { status: novoStatus },
         {
           headers: {
