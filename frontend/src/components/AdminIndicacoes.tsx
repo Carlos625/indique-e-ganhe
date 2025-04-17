@@ -72,7 +72,10 @@ const AdminIndicacoes: React.FC = () => {
       }
 
       console.log('Buscando indicações...');
-      const response = await axios.get<Indicacao[]>(`${import.meta.env.VITE_API_URL}/api/indicacoes`, {
+      const API_URL = 'http://84.247.133.199:3012';
+      console.log('URL da API:', `${API_URL}/api/indicacoes`);
+      
+      const response = await axios.get<Indicacao[]>(`${API_URL}/api/indicacoes`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
