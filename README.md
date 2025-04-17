@@ -33,7 +33,7 @@ npm install
 - Crie um arquivo `.env` na raiz do projeto
 - Adicione as seguintes variáveis:
 ```
-PORT=3001
+PORT=3012
 MONGODB_URI=mongodb://localhost:27017/indique-e-ganhe
 JWT_SECRET=sua-chave-secreta-aqui
 CORS_ORIGIN=http://localhost:5173
