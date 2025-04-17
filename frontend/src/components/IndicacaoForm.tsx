@@ -80,7 +80,7 @@ const IndicacaoForm: React.FC = () => {
 
     try {
       console.log('Enviando indicação...');
-      const API_URL = 'https://84.247.133.199:3012';
+      const API_URL = 'http://84.247.133.199:3012';
       console.log('URL da API:', `${API_URL}/api/indicacoes`);
 
       const response = await axios.post(`${API_URL}/api/indicacoes`, {

@@ -72,7 +72,7 @@ const AdminIndicacoes: React.FC = () => {
       }
 
       console.log('Buscando indicações...');
-      const API_URL = 'https://84.247.133.199:3012';
+      const API_URL = 'http://84.247.133.199:3012';
       console.log('URL da API:', `${API_URL}/api/indicacoes`);
 
       const response = await axios.get<Indicacao[]>(`${API_URL}/api/indicacoes`, {
@@ -104,7 +104,7 @@ const AdminIndicacoes: React.FC = () => {
         return;
       }
 
-      const API_URL = 'https://84.247.133.199:3012';
+      const API_URL = 'http://84.247.133.199:3012';
       console.log('Atualizando status da indicação:', id, 'para:', novoStatus);
       console.log('URL da API:', `${API_URL}/api/indicacoes/${id}/status`);
 
