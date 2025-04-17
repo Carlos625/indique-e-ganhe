@@ -13,9 +13,21 @@ import {
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
+interface TestResponse {
+  message: string;
+  count: number;
+}
+
+interface RankingItem {
+  _id: string;
+  nomeIndicador: string;
+  whatsappIndicador: string;
+  totalIndicacoes: number;
+}
+
 const TesteRanking: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<TestResponse | RankingItem[] | null>(null);
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -28,10 +40,10 @@ const TesteRanking: React.FC = () => {
         return;
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3012';
       console.log('Criando indicações de teste...');
       
-      const response = await axios.post(`${API_URL}/api/teste/indicacoes`, {}, {
+      const response = await axios.post<TestResponse>(`${API_URL}/api/teste/indicacoes`, {}, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -71,10 +83,10 @@ const TesteRanking: React.FC = () => {
         return;
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3012';
       console.log('Verificando ranking...');
       
-      const response = await axios.get(`${API_URL}/api/indicacoes/ranking`, {
+      const response = await axios.get<RankingItem[]>(`${API_URL}/api/indicacoes/ranking`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
