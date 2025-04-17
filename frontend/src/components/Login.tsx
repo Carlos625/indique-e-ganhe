@@ -70,7 +70,7 @@ const Login: React.FC = () => {
     
     try {
       console.log('Tentando fazer login com:', { username });
-      const API_URL = 'http://localhost:3001';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3012';
       console.log('URL da API:', `${API_URL}/api/users/login`);
       
       // Verificar se o servidor está online
