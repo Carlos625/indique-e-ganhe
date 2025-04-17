@@ -113,8 +113,11 @@ const IndicacaoForm: React.FC = () => {
     }
     
     try {
+      const API_URL = 'http://84.247.133.199:3012';
+      console.log('Enviando indicação para:', `${API_URL}/api/indicacoes`);
+      
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/indicacoes`,
+        `${API_URL}/api/indicacoes`,
         formData
       );
       
