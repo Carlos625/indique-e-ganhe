@@ -70,11 +70,8 @@ const Login: React.FC = () => {
     
     try {
       console.log('Tentando fazer login com:', { username });
-      const API_URL = import.meta.env.VITE_API_URL;
-      if (!API_URL) {
-        throw new Error('VITE_API_URL não está definida');
-      }
-      console.log('URL da API:', `${API_URL}/api/users/login`);
+      const API_URL = 'http://84.247.133.199:3012';
+      console.log('URL da API:', API_URL);
       
       // Verificar se o servidor está online
       try {
@@ -181,7 +178,7 @@ const Login: React.FC = () => {
         <VStack spacing={6} align="stretch">
           <Flex direction="column" align="center" mb={6}>
             <Image 
-              src="images/logo.png"
+              src="/images/logo.png"
               alt="Logo Vip Barbeiro" 
               boxSize={imageSize}
               borderRadius="full"
