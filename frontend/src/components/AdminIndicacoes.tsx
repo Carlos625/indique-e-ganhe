@@ -72,40 +72,17 @@ const AdminIndicacoes: React.FC = () => {
       }
 
       console.log('Buscando indicações...');
-      const API_URL = 'http://84.247.133.199:3012';
+      const API_URL = 'https://84.247.133.199:3012';
       console.log('URL da API:', `${API_URL}/api/indicacoes`);
-      
+
       const response = await axios.get<Indicacao[]>(`${API_URL}/api/indicacoes`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      console.log('Resposta da API:', response.data);
-
-      // Verifica se a resposta é um array
-      if (!Array.isArray(response.data)) {
-        console.error('Resposta da API não é um array:', response.data);
-        setError('Formato de dados inválido recebido do servidor');
-        setIndicacoes([]);
-        return;
-      }
-
-      // Garante que todos os itens têm os campos necessários
-      const indicacoesValidas = response.data.filter(item => 
-        item && 
-        typeof item === 'object' && 
-        '_id' in item &&
-        'nomeIndicado' in item &&
-        'whatsappIndicado' in item &&
-        'nomeIndicador' in item &&
-        'whatsappIndicador' in item &&
-        'status' in item &&
-        'dataCriacao' in item
-      );
-
-      console.log('Indicações válidas:', indicacoesValidas);
-      setIndicacoes(indicacoesValidas);
+      console.log('Resposta:', response.data);
+      setIndicacoes(response.data);
       setError(null);
     } catch (error: any) {
       console.error('Erro ao buscar indicações:', error);
@@ -113,7 +90,6 @@ const AdminIndicacoes: React.FC = () => {
         navigate('/login');
       } else {
         setError('Não foi possível carregar as indicações. Tente novamente mais tarde.');
-        setIndicacoes([]);
       }
     } finally {
       setLoading(false);
@@ -128,7 +104,7 @@ const AdminIndicacoes: React.FC = () => {
         return;
       }
 
-      const API_URL = 'http://84.247.133.199:3012';
+      const API_URL = 'https://84.247.133.199:3012';
       console.log('Atualizando status da indicação:', id, 'para:', novoStatus);
       console.log('URL da API:', `${API_URL}/api/indicacoes/${id}/status`);
 

@@ -69,9 +69,9 @@ const Login: React.FC = () => {
     }
     
     try {
-      console.log('Tentando fazer login com:', { username });
-      const API_URL = 'http://84.247.133.199:3012';
-      console.log('URL da API:', API_URL);
+      console.log('Tentando fazer login...');
+      const API_URL = 'https://84.247.133.199:3012';
+      console.log('URL da API:', `${API_URL}/api/users/login`);
       
       // Verificar se o servidor está online
       try {
@@ -95,7 +95,7 @@ const Login: React.FC = () => {
         password,
       });
       
-      console.log('Resposta do servidor:', response.data);
+      console.log('Resposta:', response.data);
       const { token } = response.data;
       
       if (!token) {

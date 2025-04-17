@@ -76,60 +76,30 @@ const IndicacaoForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Validação
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.nomeIndicado) {
-      newErrors.nomeIndicado = 'Nome é obrigatório';
-    }
-    
-    if (!formData.whatsappIndicado) {
-      newErrors.whatsappIndicado = 'WhatsApp é obrigatório';
-    } else if (!validateWhatsApp(formData.whatsappIndicado)) {
-      newErrors.whatsappIndicado = getWhatsAppErrorMessage(formData.whatsappIndicado);
-    }
-    
-    if (!formData.nomeIndicador) {
-      newErrors.nomeIndicador = 'Nome é obrigatório';
-    }
-    
-    if (!formData.whatsappIndicador) {
-      newErrors.whatsappIndicador = 'WhatsApp é obrigatório';
-    } else if (!validateWhatsApp(formData.whatsappIndicador)) {
-      newErrors.whatsappIndicador = getWhatsAppErrorMessage(formData.whatsappIndicador);
-    }
-    
-    // Verifica se é auto-indicação
-    if (formData.whatsappIndicado === formData.whatsappIndicador) {
-      newErrors.whatsappIndicado = 'Você não pode indicar seu próprio número';
-      newErrors.whatsappIndicador = 'Você não pode indicar seu próprio número';
-    }
-    
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      setLoading(false);
-      return;
-    }
-    
+    setErrors({});
+
     try {
-      const API_URL = 'http://84.247.133.199:3012';
-      console.log('Enviando indicação para:', `${API_URL}/api/indicacoes`);
-      
-      const response = await axios.post(
-        `${API_URL}/api/indicacoes`,
-        formData
-      );
-      
+      console.log('Enviando indicação...');
+      const API_URL = 'https://84.247.133.199:3012';
+      console.log('URL da API:', `${API_URL}/api/indicacoes`);
+
+      const response = await axios.post(`${API_URL}/api/indicacoes`, {
+        nomeIndicador: formData.nomeIndicador,
+        whatsappIndicador: formData.whatsappIndicador,
+        nomeIndicado: formData.nomeIndicado,
+        whatsappIndicado: formData.whatsappIndicado,
+      });
+
+      console.log('Resposta:', response.data);
       toast({
         title: 'Indicação enviada com sucesso!',
-        description: 'Agradecemos sua indicação.',
+        description: 'Em breve entraremos em contato.',
         status: 'success',
         duration: 5000,
         isClosable: true,
       });
-      
-      // Limpa o formulário após sucesso
+
+      // Limpa o formulário
       setFormData({
         nomeIndicado: '',
         whatsappIndicado: '',
@@ -138,53 +108,12 @@ const IndicacaoForm: React.FC = () => {
       });
     } catch (error: any) {
       console.error('Erro ao enviar indicação:', error);
-      
-      // Tratamento específico para erros de validação do backend
-      if (error.response?.status === 400) {
-        const errorMessage = error.response.data?.error || error.response.data?.message;
-        
-        if (errorMessage?.includes('auto-indicar')) {
-          toast({
-            title: 'Auto-indicação não permitida',
-            description: 'Você não pode indicar seu próprio número de WhatsApp.',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-          });
-        } else if (errorMessage?.includes('já foi indicada')) {
-          toast({
-            title: 'Indicação já realizada',
-            description: 'Este número já foi indicado anteriormente.',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-          });
-        } else if (errorMessage?.includes('Formato de WhatsApp inválido')) {
-          toast({
-            title: 'Formato de WhatsApp inválido',
-            description: 'Certifique-se de inserir o número no formato: (99) 9 9999-9999',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-          });
-        } else {
-          toast({
-            title: 'Erro ao enviar indicação',
-            description: errorMessage || 'Ocorreu um erro ao processar sua indicação. Tente novamente.',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-          });
-        }
-      } else {
-        toast({
-          title: 'Erro ao enviar indicação',
-          description: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-      }
+      setErrors({
+        nomeIndicado: error.response?.data?.error?.includes('Nome') ? error.response.data.error : undefined,
+        whatsappIndicado: error.response?.data?.error?.includes('WhatsApp') ? error.response.data.error : undefined,
+        nomeIndicador: error.response?.data?.error?.includes('Nome') ? error.response.data.error : undefined,
+        whatsappIndicador: error.response?.data?.error?.includes('WhatsApp') ? error.response.data.error : undefined,
+      });
     } finally {
       setLoading(false);
     }
