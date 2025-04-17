@@ -9,7 +9,7 @@ import User from './models/User';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3012;
+const PORT = parseInt(process.env.PORT || '3012', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-aqui';
 
 // Middleware
@@ -427,6 +427,6 @@ app.post('/api/teste/indicacoes', authenticateToken, async (req, res) => {
 });
 
 // Iniciar o servidor
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 }); 
